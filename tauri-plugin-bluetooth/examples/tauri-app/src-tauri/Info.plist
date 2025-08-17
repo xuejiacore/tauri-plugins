@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.nigel.airkey</string>
+
+    <key>com.apple.developer.storekit</key>
+    <true/>
+
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>App needs Bluetooth to scan devices</string>
+
+    <key>NSBluetoothPeripheralUsageDescription</key>
+    <string>App needs Bluetooth to connect to devices</string>
+</dict>
+</plist>

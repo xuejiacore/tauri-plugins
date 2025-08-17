@@ -1,43 +1,35 @@
-import reactLogo from "./assets/react.svg";
 import "./App.css";
-import {ping} from "../../../guest-js";
+import {connect} from "../../../bluetooth-api";
+import {useState} from "react";
 
 function App() {
 
-    async function greet() {
-        await ping('te');
+    const [echoValue, setEchoValue] = useState<string | null>('');
+
+    async function tryEcho() {
+        await connect().then(r => {
+            setEchoValue(`connected:${r}`);
+        });
     }
 
     return (
         <main className="container">
-            <h1>Welcome to Tauri + React</h1>
-
-            <div className="row">
-                <a href="https://vite.dev" target="_blank">
-                    <img src="/vite.svg" className="logo vite" alt="Vite logo"/>
-                </a>
-                <a href="https://tauri.app" target="_blank">
-                    <img src="/tauri.svg" className="logo tauri" alt="Tauri logo"/>
-                </a>
-                <a href="https://react.dev" target="_blank">
-                    <img src={reactLogo} className="logo react" alt="React logo"/>
-                </a>
-            </div>
-            <p>Click on the Tauri, Vite, and React logos to learn more.</p>
+            <h1>Example for Bluetooth Plugin</h1>
 
             <form
                 className="row"
                 onSubmit={(e) => {
                     e.preventDefault();
-                    greet();
-                }}
-            >
+                    tryEcho().finally();
+                }}>
                 <input
                     id="greet-input"
-                    placeholder="Enter a name..."
+                    placeholder="Echo value"
                 />
-                <button type="submit">Greet</button>
+                <button type="submit">Test Echo</button>
+
             </form>
+            <p>{echoValue}</p>
         </main>
     );
 }
