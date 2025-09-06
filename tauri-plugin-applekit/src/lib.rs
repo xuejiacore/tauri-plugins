@@ -10,6 +10,7 @@ mod desktop;
 #[cfg(mobile)]
 mod mobile;
 
+mod bridge;
 mod commands;
 mod error;
 mod models;
@@ -35,7 +36,7 @@ impl<R: Runtime, T: Manager<R>> crate::ApplekitExt<R> for T {
 /// Initializes the plugin.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("applekit")
-        .invoke_handler(tauri::generate_handler![commands::ping])
+        .invoke_handler(tauri::generate_handler![commands::set_user_default, commands::get_user_default])
         .setup(|app, api| {
             #[cfg(mobile)]
             let applekit = mobile::init(app, api)?;

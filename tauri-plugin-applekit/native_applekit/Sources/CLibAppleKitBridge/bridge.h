@@ -2,8 +2,9 @@
 extern "C" {
 #endif
 
-// echo for test
-const char* echo(const char* echo);
+const void set_user_default(const char* keyPtr, const char* valuePtr);
+
+const char* get_user_default(const char* keyPtr);
 
 #ifdef __cplusplus
 }

@@ -4,7 +4,7 @@ use std::{env, fs};
 
 const LIB_NAME: &str = "CLibAppleKitBridge";
 const SWIFT_CODE_DIR: &str = "native_applekit";
-const COMMANDS: &[&str] = &["ping"];
+const COMMANDS: &[&str] = &["set_user_default", "get_user_default"];
 
 fn main() {
     let static_lib_name = format!("lib{}.a", LIB_NAME);
