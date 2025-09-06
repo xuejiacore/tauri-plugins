@@ -4,7 +4,14 @@ use std::{env, fs};
 
 const LIB_NAME: &str = "CLibBluKitBridge";
 const SWIFT_CODE_DIR: &str = "native_bluetooth";
-const COMMANDS: &[&str] = &["echo", "connect"];
+const COMMANDS: &[&str] = &[
+    "start_scanning",
+    "stop_scanning",
+    "set_passive_mode",
+    "connect_device",
+    "disconnect_device",
+    "read_rssi",
+];
 
 fn main() {
     let static_lib_name = format!("lib{}.a", LIB_NAME);

@@ -41,8 +41,43 @@ impl<R: Runtime> BluetoothApi<R> for Bluetooth<R> {
         }
     }
 
-    fn connect(&self) -> bool {
-        unsafe { bridge::connect() }
+    fn initialize(&self) {
+        unsafe {
+            bridge::initialize();
+        }
+    }
+
+    fn start_scanning(&self) -> bool {
+        unsafe { bridge::start_scanning() }
+    }
+
+    fn stop_scanning(&self) -> bool {
+        unsafe { bridge::stop_scanning() }
+    }
+
+    fn set_passive_mode(&self, mode: bool) {
+        unsafe { bridge::set_passive_mode(mode) }
+    }
+
+    fn connect_device(&self, identifier: String) -> bool {
+        unsafe {
+            let value = CString::new(identifier.as_str()).unwrap();
+            bridge::connect_device(value.as_ptr())
+        }
+    }
+
+    fn disconnect_device(&self, identifier: String) -> bool {
+        unsafe {
+            let value = CString::new(identifier.as_str()).unwrap();
+            bridge::disconnect_device(value.as_ptr())
+        }
+    }
+
+    fn read_rssi(&self, identifier: String) {
+        unsafe {
+            let value = CString::new(identifier.as_str()).unwrap();
+            bridge::read_rssi(value.as_ptr())
+        }
     }
 
     fn set_delegate<DELEGATE>(&self, delegate: DELEGATE)

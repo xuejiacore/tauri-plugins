@@ -1,0 +1,19 @@
+[package]
+name = "tauri-plugin-storekit2"
+version = "0.1.0"
+authors = [ "You" ]
+description = ""
+edition = "2021"
+rust-version = "1.77.2"
+exclude = ["/examples", "/dist-js", "/guest-js", "/node_modules"]
+links = "tauri-plugin-storekit2"
+
+[dependencies]
+tauri = { version = "2.5.0" }
+serde = "1.0"
+thiserror = "2"
+once_cell = "1.21.3"
+serde_json = "1"
+
+[build-dependencies]
+tauri-plugin = { version = "2.2.0", features = ["build"] }

@@ -17,7 +17,8 @@ mod models;
 
 pub use error::{Error, Result};
 
-use crate::bridge::BLEDelegate;
+use crate::bridge::{BLEDelegate, BluetoothApi};
+use crate::commands::{set_passive_mode, start_scanning, stop_scanning, connect_device, disconnect_device, read_rssi};
 #[cfg(desktop)]
 use desktop::Bluetooth;
 #[cfg(mobile)]
@@ -37,12 +38,20 @@ impl<R: Runtime, T: Manager<R>> crate::BluetoothExt<R> for T {
 /// Initializes the plugin.
 pub fn init<R: Runtime, DELEGATE: BLEDelegate + 'static>(delegate: DELEGATE) -> TauriPlugin<R> {
     Builder::new("bluetooth")
-        .invoke_handler(tauri::generate_handler![commands::echo, commands::connect])
+        .invoke_handler(tauri::generate_handler![
+            start_scanning,
+            stop_scanning,
+            set_passive_mode,
+            connect_device,
+            disconnect_device,
+            read_rssi,
+        ])
         .setup(|app, api| {
             #[cfg(mobile)]
             let bluetooth = mobile::init(app, api)?;
             #[cfg(desktop)]
             let bluetooth = desktop::init(app, api, delegate)?;
+            bluetooth.initialize();
             app.manage(bluetooth);
             Ok(())
         })

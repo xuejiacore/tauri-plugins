@@ -44,7 +44,19 @@ pub type NativeBluetoothPowerWarnHandler = extern "C" fn();
 extern "C" {
     pub(crate) fn echo(value: *const c_char) -> *const c_char;
 
-    pub(crate) fn connect() -> bool;
+    pub(crate) fn initialize();
+
+    pub(crate) fn start_scanning() -> bool;
+
+    pub(crate) fn stop_scanning() -> bool;
+
+    pub(crate) fn set_passive_mode(mode: bool);
+
+    pub(crate) fn connect_device(identifier: *const c_char) -> bool;
+
+    pub(crate) fn disconnect_device(identifier: *const c_char) -> bool;
+
+    pub(crate) fn read_rssi(identifier: *const c_char);
 
     pub(crate) fn set_delegate(
         on_device_new: NativeDeviceDelegate,
@@ -59,7 +71,19 @@ extern "C" {
 pub(crate) trait BluetoothApi<R: Runtime> {
     fn echo(&self, value: String) -> String;
 
-    fn connect(&self) -> bool;
+    fn initialize(&self);
+
+    fn start_scanning(&self) -> bool;
+
+    fn stop_scanning(&self) -> bool;
+
+    fn set_passive_mode(&self, mode: bool);
+
+    fn connect_device(&self, identifier: String) -> bool;
+
+    fn disconnect_device(&self, identifier: String) -> bool;
+
+    fn read_rssi(&self, identifier: String);
 
     fn set_delegate<DELEGATE>(&self, delegate: DELEGATE)
     where

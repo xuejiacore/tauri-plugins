@@ -1,3 +1,10 @@
 [default]
 description = "Default permissions for the plugin"
-permissions = ["allow-echo", "allow-connect"]
+permissions = [
+    "allow-start-scanning",
+    "allow-stop-scanning",
+    "allow-set-passive-mode",
+    "allow-connect-device",
+    "allow-disconnect-device",
+    "allow-read-rssi"
+]

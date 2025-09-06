@@ -1,5 +1,5 @@
 [package]
-name = "tauri-app"
+name = "example-app-bluetooth"
 version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
@@ -9,7 +9,7 @@ edition = "2021"
 rust-version = "1.77.2"
 
 [lib]
-name = "tauri_app_lib"
+name = "example_app_bluetooth"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -18,6 +18,6 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.2.0", default-features = false }
 
 [dependencies]
-tauri = { version = "2.5.0" , features = ["macos-private-api"]}
+tauri = { version = "2.7.0" , features = ["macos-private-api"]}
 tauri-plugin-bluetooth = { path = "../../../" }
 

@@ -6,6 +6,8 @@ class SharedBLE {
     @MainActor static let shareDelegate = BLEDelegateImpl();
 }
 
+// MARK: - BLE Function Delegation
+
 class BLEDelegateImpl: BLEDelegate {
     var onDeviceNew: DeviceCallback;
     var onDeviceUpdate: DeviceCallback;
@@ -82,18 +84,66 @@ public typealias PresenceUpdateCallback = @convention(c) @Sendable (
 
 public typealias BlePowerWarnCallback = @convention(c) @Sendable () -> Void;
 
+// MARK: - Bridge Function Definition
+
 @_cdecl("echo")
 public func echo(value: UnsafePointer<CChar>) -> UnsafeMutablePointer<CChar>? {
     return strdup(value)
 }
 
-@_cdecl("connect")
-public func connect() -> Bool {
+@_cdecl("initialize")
+public func initialize() {
     DispatchQueue.main.async {
         SharedBLE.shared.delegate = SharedBLE.shareDelegate;
+    }
+}
+
+@_cdecl("start_scanning")
+public func startScanning() -> Bool {
+    DispatchQueue.main.async {
         SharedBLE.shared.startScanning();
     }
     return true
+}
+
+@_cdecl("stop_scanning")
+public func stopScanning() -> Bool {
+    DispatchQueue.main.async{
+        SharedBLE.shared.stopScanning();
+    }
+    return true
+}
+
+@_cdecl("set_passive_mode")
+public func setPassiveMode(mode: Bool) {
+    DispatchQueue.main.async {
+        SharedBLE.shared.setPassiveMode(mode)
+    }
+}
+
+@_cdecl("connect_device")
+public func connectDevice(identifier: UnsafePointer<CChar>) -> Bool {
+    guard let uuid = UUID(uuidString: String(cString: identifier)) else {return false}
+    return DispatchQueue.main.sync {
+        return SharedBLE.shared.connectDevice(identifier: uuid)
+    }
+}
+
+@_cdecl("disconnect_device")
+public func disconnectDevice(identifier: UnsafePointer<CChar>) -> Bool {
+    guard let uuid = UUID(uuidString: String(cString: identifier)) else {return false}
+    
+    return DispatchQueue.main.sync {
+        return SharedBLE.shared.disconnectDevice(identifier: uuid)
+    }
+}
+
+@_cdecl("read_rssi")
+public func readRssi(identifier: UnsafePointer<CChar>) -> Void {
+    guard let uuid = UUID(uuidString: String(cString: identifier)) else {return}
+    DispatchQueue.main.async {
+        SharedBLE.shared.readRssi(identifier: uuid)
+    }
 }
 
 @_cdecl("set_delegate")
@@ -150,9 +200,6 @@ func callDeviceCallback(_ device: Device, callback: DeviceCallback) {
         name!,
         String(describing: state)
     )
-    
-    // ⚠️ 注意：回调里拿到的是 strdup 分配的内存
-    // 责任在 C/Rust 端 free() 释放
 }
 
 func peripheralStateString(_ state: CBPeripheralState?) -> String {

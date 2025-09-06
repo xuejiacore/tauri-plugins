@@ -56,7 +56,7 @@ let bluetoothCharacteristicNames: [String: String] = [
     "2A03": "Reconnection Address",
     "2A04": "Peripheral Preferred Connection Parameters",
     "2A05": "Service Changed",
-
+    
     // 设备信息
     "2A23": "System ID",
     "2A24": "Model Number String",
@@ -65,30 +65,30 @@ let bluetoothCharacteristicNames: [String: String] = [
     "2A27": "Hardware Revision String",
     "2A28": "Software Revision String",
     "2A29": "Manufacturer Name String",
-
+    
     // 电池
     "2A19": "Battery Level",
-
+    
     // 心率
     "2A37": "Heart Rate Measurement",
     "2A38": "Body Sensor Location",
     "2A39": "Heart Rate Control Point",
-
+    
     // 血压
     "2A35": "Blood Pressure Measurement",
     "2A36": "Intermediate Cuff Pressure",
     "2A49": "Blood Pressure Feature",
-
+    
     // 温度
     "2A1C": "Temperature Measurement",
     "2A1D": "Temperature Type",
     "2A1E": "Intermediate Temperature",
-
+    
     // 时间
     "2A2B": "Current Time",
     "2A0F": "Local Time Information",
     "2A14": "Reference Time Information",
-
+    
     // 运动
     "2A53": "RSC Measurement",
     "2A54": "RSC Feature",
@@ -96,7 +96,7 @@ let bluetoothCharacteristicNames: [String: String] = [
     "2A64": "Cycling Power Vector",
     "2A65": "Cycling Power Feature",
     "2A66": "Cycling Power Control Point",
-
+    
     // 健康
     "2A9D": "Weight Measurement",
     "2A9E": "Weight Scale Feature",
@@ -239,7 +239,7 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     // RSSI 样本
     private var rssiSamples: [Int] = []
     private var filteredRSSI: Double?
-
+    
     // 滤波参数
     private let alpha: Double = 0.15  // EMA 平滑系数 α取值 0.1~0.3 比较常用，能平滑瞬时波动
     
@@ -253,11 +253,13 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         print("Start scanning")
     }
     
+    /// 开始进行设备扫描，每次调用后，scanMode 设置为scanMode = true
     func startScanning() {
         scanMode = true
         scanForPeripherals()
     }
     
+    /// 停止扫描
     func stopScanning() {
         scanMode = false
         if activeModeTimer != nil {
@@ -265,6 +267,23 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         }
     }
     
+    /// 移除设备
+    func removeDevice(identifier: UUID) -> Bool {
+        guard let device = devices[identifier] else {
+            print("Device not found.")
+            return false
+        }
+        
+        
+        self.delegate?.removeDevice(device: device)
+        if let p = device.peripheral {
+            self.centralMgr.cancelPeripheralConnection(p)
+        }
+        self.devices.removeValue(forKey: device.uuid)
+        return true
+    }
+    
+    /// 设置被动模式
     func setPassiveMode(_ mode: Bool) {
         passiveMode = mode
         if passiveMode {
@@ -277,33 +296,21 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         scanForPeripherals()
     }
     
+    /// 开始监控某一个uuid的设备
     func startMonitor(uuid: UUID) {
+        // 如果有已经监控中的设备，那么先取消监控
         if let p = monitoredPeripheral {
             centralMgr.cancelPeripheralConnection(p)
         }
+        
+        // 设置监控中心的uuid
         monitoredUUID = uuid
         proximityTimer?.invalidate()
-        resetSignalTimer()
         presence = true
         monitoredPeripheral = nil
         activeModeTimer?.invalidate()
         activeModeTimer = nil
         scanForPeripherals()
-    }
-    
-    func resetSignalTimer() {
-        signalTimer?.invalidate()
-        signalTimer = Timer.scheduledTimer(withTimeInterval: signalTimeout, repeats: false, block: { _ in
-            print("Device is lost")
-            self.delegate?.updateRSSI(rssi: nil, estimatedRSSI: nil, active: false)
-            if self.presence {
-                self.presence = false
-                self.delegate?.updatePresence(presence: self.presence, reason: "lost")
-            }
-        })
-        if let timer = signalTimer {
-            RunLoop.main.add(timer, forMode: .common)
-        }
     }
     
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
@@ -339,53 +346,10 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         return Int(mean)
     }
     
-    func updateMonitoredPeripheral(_ rssi: Int) {
-        // 滤波器平滑+校准环境
-        handleRSSI(rssi);
-        
-        if rssi >= (unlockRSSI == UNLOCK_DISABLED ? lockRSSI : unlockRSSI) && !presence {
-            print("Device is close")
-            presence = true
-            delegate?.updatePresence(presence: presence, reason: "close")
-            latestRSSIs.removeAll() // Avoid bouncing
-        }
-        
-        let estimatedRSSI = getEstimatedRSSI(rssi: rssi)
-        delegate?.updateRSSI(rssi: rssi, estimatedRSSI: estimatedRSSI, active: activeModeTimer != nil)
-        
-        if estimatedRSSI >= (lockRSSI == LOCK_DISABLED ? unlockRSSI : lockRSSI) {
-            if let timer = proximityTimer {
-                timer.invalidate()
-                print("Proximity timer canceled")
-                proximityTimer = nil
-            }
-        } else if presence && proximityTimer == nil {
-            proximityTimer = Timer.scheduledTimer(withTimeInterval: proximityTimeout, repeats: false, block: { _ in
-                print("Device is away")
-                self.presence = false
-                self.delegate?.updatePresence(presence: self.presence, reason: "away")
-                self.proximityTimer = nil
-            })
-            RunLoop.main.add(proximityTimer!, forMode: .common)
-            print("Proximity timer started")
-        }
-        resetSignalTimer()
+    func updatePeripheral(_ peripheral: CBPeripheral, _ rssi: NSNumber) {
+        print("peripheral: \(peripheral.identifier) \(peripheral.state) \(rssi)")
     }
-    
-    func resetScanTimer(device: Device) {
-        device.scanTimer?.invalidate()
-        device.scanTimer = Timer.scheduledTimer(withTimeInterval: signalTimeout, repeats: false, block: { _ in
-            self.delegate?.removeDevice(device: device)
-            if let p = device.peripheral {
-                self.centralMgr.cancelPeripheralConnection(p)
-            }
-            self.devices.removeValue(forKey: device.uuid)
-        })
-        if let timer = device.scanTimer {
-            RunLoop.main.add(timer, forMode: .common)
-        }
-    }
-    
+
     func connectMonitoredPeripheral() {
         guard let p = monitoredPeripheral else { return }
         
@@ -406,32 +370,73 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         RunLoop.main.add(connectionTimer!, forMode: .common)
     }
     
+    func connectDevice(identifier: UUID) -> Bool {
+        guard let device = devices[identifier] else {
+            print("Device not found.")
+            return false
+        }
+        guard let peripheral = device.peripheral else {
+            print("Device peripheral invalidate.")
+            return false
+        }
+        
+        // Idk why but this works like a charm when 'didConnect' won't get called.
+        // However, this generates warnings in the log.
+        peripheral.readRSSI()
+        guard peripheral.state == .disconnected else {
+            print("Peripheral state is not disconnected.")
+            return false
+        }
+        centralMgr.connect(peripheral, options: nil)
+        print("Peripheral connected.")
+        return true
+    }
+    
+    func disconnectDevice(identifier: UUID) -> Bool {
+        guard let device = devices[identifier] else {
+            print("Device not found.")
+            return false
+        }
+        guard let peripheral = device.peripheral else {
+            print("Device peripheral invalidate.")
+            return false
+        }
+        guard peripheral.state == .connected else {
+            print("Peripheral state is not connected.")
+            return false
+        }
+        centralMgr.cancelPeripheralConnection(peripheral)
+        print("Peripheral disconnected.")
+        return true
+    }
+    
+    func readRssi(identifier: UUID) -> Void {
+        print("readRssi \(identifier.uuidString)")
+        
+        guard let device = devices[identifier] else {return}
+        guard let peripheral = device.peripheral else {return}
+        guard peripheral.state == .connected else {return}
+        peripheral.readRSSI();
+    }
+    
     //MARK:- CBCentralManagerDelegate start
     
+    /// - Params:
+    ///   - advertisementData:
+    ///     - CBAdvertisementDataLocalNameKey: 设备名称，外设广播的本地名称（可能是完整名，也可能是缩写）,例："AirPods Pro"
+    ///     - CBAdvertisementDataTxPowerLevelKey: 外设的发射功率（单位 dBm）,可用于结合 RSSI 算距离
+    ///     - CBAdvertisementDataManufacturerDataKey: 厂商自定义的二进制数据，第一个两个字节通常是 Company Identifier（公司 ID，蓝牙 SIG 分配的 16-bit 编号）,剩下是厂商自定义 payload
+    ///     - CBAdvertisementDataServiceUUIDsKey: 外设在广播包中声明的服务 UUID 列表，只是一种“提示”，不保证包含设备的所有服务
+    ///     - CBAdvertisementDataServiceDataKey: 每个 UUID 对应的服务数据（自定义格式），比如 iBeacon、Eddystone 就会放在这里
+    ///     - CBAdvertisementDataOverflowServiceUUIDsKey: 当 UUID 太多无法放进普通广播包时，会放在溢出区域（需要主动扫描才有可能拿到）
+    ///     - CBAdvertisementDataIsConnectable: 是否支持连接。true = 可以发起连接，false = 仅广播。
+    ///     - CBAdvertisementDataSolicitedServiceUUIDsKey: 外设请求中心设备提供的服务 UUID（较少用）
     func centralManager(_ central: CBCentralManager,
                         didDiscover peripheral: CBPeripheral,
                         advertisementData: [String : Any],
                         rssi RSSI: NSNumber)
     {
         let rssi = RSSI.intValue > 0 ? 0 : RSSI.intValue
-        if let uuid = monitoredUUID {
-            if peripheral.identifier.description == uuid.description {
-                if monitoredPeripheral == nil {
-                    monitoredPeripheral = peripheral
-                }
-                if activeModeTimer == nil {
-                    print("Discover \(rssi)dBm")
-                    updateMonitoredPeripheral(rssi)
-                    if !passiveMode {
-                        connectMonitoredPeripheral()
-                    }
-                }
-            }
-        }
-        
-        let type = detectPeripheralType(peripheral: peripheral, advertisementData: advertisementData)
-        //print("设备类型: \(type)")
-        
         if (scanMode) {
             if let uuids = advertisementData["kCBAdvDataServiceUUIDs"] as? [CBUUID] {
                 for uuid in uuids {
@@ -452,16 +457,10 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
                     device.advData = advertisementData["kCBAdvDataManufacturerData"] as? Data
                     
                     let parsed = parseAdvertisementData(advertisementData)
-                    print("发现设备: \(peripheral.identifier.uuidString)")
-                    print("广播信息: \(parsed)")
-        
-                    
                     devices[peripheral.identifier] = device
-                    central.connect(peripheral, options: nil)
                     delegate?.newDevice(device: device)
                     
                     let desc = device.getDescription()
-                    //print("Device \(String(describing: device.uuid)), rssi = \(rssi) >= thresholdRSSI = \(thresholdRSSI), \(desc)")
                 }
             } else {
                 device = dev!
@@ -469,12 +468,11 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
                 delegate?.updateDevice(device: device)
                 
                 let desc = device.getDescription()
-                //print("Update \(String(describing: device.uuid)), rssi = \(rssi) >= thresholdRSSI = \(thresholdRSSI), \(desc)")
             }
-            resetScanTimer(device: device)
         }
     }
     
+    /// 检查设备的类型
     func detectPeripheralType(peripheral: CBPeripheral, advertisementData: [String: Any]) -> String {
         // 1️⃣ 检查 Service UUIDs
         if let serviceUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] {
@@ -510,7 +508,7 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         }
         return key
     }
-
+    
     /// 把 UUID 转换为 `名称 (UUID)` 格式
     func describeUUID(_ uuid: CBUUID) -> String {
         let key = uuid.uuidString.uppercased()
@@ -519,31 +517,31 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         }
         return key
     }
-
+    
     /// 广播数据解析
     func parseAdvertisementData(_ advertisementData: [String: Any]) -> [String: Any] {
         var result: [String: Any] = [:]
-
+        
         // Local Name
         if let localName = advertisementData[CBAdvertisementDataLocalNameKey] as? String {
             result["LocalName"] = localName
         }
-
+        
         // Manufacturer Data
         if let manufacturerData = advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data {
             result["ManufacturerData"] = manufacturerData.map { String(format: "%02hhX", $0) }.joined()
         }
-
+        
         // Service UUIDs
         if let serviceUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID] {
             result["ServiceUUIDs"] = serviceUUIDs.map { describeUUID($0) }
         }
-
+        
         // Solicited Service UUIDs
         if let solicitedUUIDs = advertisementData[CBAdvertisementDataSolicitedServiceUUIDsKey] as? [CBUUID] {
             result["SolicitedServiceUUIDs"] = solicitedUUIDs.map { describeUUID($0) }
         }
-
+        
         // Service Data
         if let serviceData = advertisementData[CBAdvertisementDataServiceDataKey] as? [CBUUID: Data] {
             var dict: [String: String] = [:]
@@ -552,22 +550,22 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
             }
             result["ServiceData"] = dict
         }
-
+        
         // Tx Power
         if let txPower = advertisementData[CBAdvertisementDataTxPowerLevelKey] as? NSNumber {
             result["TxPowerLevel"] = txPower
         }
-
+        
         // Connectable
         if let connectable = advertisementData[CBAdvertisementDataIsConnectable] as? NSNumber {
             result["IsConnectable"] = (connectable.boolValue ? "Yes" : "No")
         }
-
+        
         // Overflow UUIDs
         if let overflowUUIDs = advertisementData[CBAdvertisementDataOverflowServiceUUIDsKey] as? [CBUUID] {
             result["OverflowServiceUUIDs"] = overflowUUIDs.map { describeUUID($0) }
         }
-
+        
         return result
     }
     
@@ -609,7 +607,7 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         if scanMode {
             peripheral.discoverServices([DeviceInformation])
         }
-        if peripheral == monitoredPeripheral && !passiveMode {
+        if !passiveMode {
             print("Connected")
             connectionTimer?.invalidate()
             connectionTimer = nil
@@ -617,37 +615,12 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
         }
     }
     
-    //MARK:CBCentralManagerDelegate end -
+    // MARK: CBCentralManagerDelegate end
     
-    //MARK:- CBPeripheralDelegate start
+    // MARK: CBPeripheralDelegate start
     
     func peripheral(_ peripheral: CBPeripheral, didReadRSSI RSSI: NSNumber, error: Error?) {
-        guard peripheral == monitoredPeripheral else { return }
-        let rssi = RSSI.intValue > 0 ? 0 : RSSI.intValue
-        //print("readRSSI \(rssi)dBm")
-        updateMonitoredPeripheral(rssi)
-        lastReadAt = Date().timeIntervalSince1970
-        
-        if activeModeTimer == nil && !passiveMode {
-            print("Entering active mode")
-            if !scanMode {
-                centralMgr.stopScan()
-            }
-            activeModeTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true, block: { _ in
-                if Date().timeIntervalSince1970 > self.lastReadAt + 10 {
-                    print("Falling back to passive mode")
-                    self.centralMgr.cancelPeripheralConnection(peripheral)
-                    self.activeModeTimer?.invalidate()
-                    self.activeModeTimer = nil
-                    self.scanForPeripherals()
-                } else if peripheral.state == .connected {
-                    peripheral.readRSSI()
-                } else {
-                    self.connectMonitoredPeripheral()
-                }
-            })
-            RunLoop.main.add(activeModeTimer!, forMode: .common)
-        }
+        updatePeripheral(peripheral, RSSI)
     }
     
     func peripheral(_ peripheral: CBPeripheral,
@@ -703,11 +676,11 @@ class BLE: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate {
     {
         peripheral.discoverServices([DeviceInformation])
     }
-    //MARK:CBPeripheralDelegate end -
+    // MARK: CBPeripheralDelegate end -
     
     override init() {
         super.init()
         centralMgr = CBCentralManager(delegate: self, queue: nil)
-        monitoredUUID = UUID.init(uuidString: "E337A089-2E40-C91B-9153-869A90FFA727");
+        //monitoredUUID = UUID.init(uuidString: "E337A089-2E40-C91B-9153-869A90FFA727");
     }
 }
